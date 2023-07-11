@@ -1,0 +1,9 @@
+{
+  "name": "DistributionRequestPlanner",
+  "version": "0.0.1",
+  "title": "Distribution Request Planner",
+  "author": "hsp9513",
+  "factorio_version": "1.1",
+  "dependencies": ["base >= 1.1"],
+  "description": "Adds a planner that can make distribution request. For a given recipe, each ingredient can be requested in a different request box. This can be useful if you are using a mod with many ingredients required by the recipe. The Distribution Request Planner can be found in Shortcuts."
+}
