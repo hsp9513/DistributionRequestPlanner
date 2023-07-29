@@ -141,7 +141,7 @@ function on_player_selected_area(event)
             local requesters={}
             for _,entity in pairs(event.entities) do
                --game.print(entity.unit_number.. entity.prototype.logistic_mode )
-               if entity.prototype.logistic_mode == "requester" then
+               if entity.prototype.logistic_mode == "requester" or entity.prototype.logistic_mode == "buffer" then
                    table.insert(requesters, entity)
                    --for slot=1, entity.request_slot_count do
                    --    entity.clear_request_slot(slot)
@@ -155,6 +155,10 @@ function on_player_selected_area(event)
 
             local req_num = #requesters
             player.print({"distribution-request-planner.selected-chest",req_num})
+
+            if req_num==0 then
+                return
+            end
 
             --local toast_info = {}
             for i=1,#requests do 
