@@ -7,7 +7,7 @@ requester.localised_description=''
 requester.stack_size = 1
 requester.stackable = false
 requester.entity_type_filters = {"logistic-container"}
-requester.reverse_entity_type_filters = {"assembling-machine"}
+requester.reverse_entity_type_filters = {"assembling-machine","rocket-silo"}
 
 requester.flags = {"only-in-cursor", "spawnable"}
 requester.icons={
