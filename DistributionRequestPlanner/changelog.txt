@@ -1,0 +1,14 @@
+---------------------------------------------------------------------------------------------------
+Version: 0.0.2
+Date: 2023-07-29
+  Changes:
+    - A rocket silo can also be a recipe copy target.
+  Bugfixes:
+    - Fixed a crash when selecting logistic chest excluding requester chest.
+
+
+---------------------------------------------------------------------------------------------------
+Version: 0.0.1
+Date: 2023-07-11
+  Changes:
+    - First version÷
