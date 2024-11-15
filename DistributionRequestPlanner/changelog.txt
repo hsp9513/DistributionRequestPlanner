@@ -1,4 +1,13 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.0.3
+Date: 2024-11-16
+  Changes:
+    - Factorio 2.0 supports
+  Bugfixes:
+    - Fixed the issue where 0 item could be requested when the crafting speed was too slow.
+
+
+---------------------------------------------------------------------------------------------------
 Version: 0.0.2
 Date: 2023-07-29
   Changes:
@@ -11,4 +20,4 @@ Date: 2023-07-29
 Version: 0.0.1
 Date: 2023-07-11
   Changes:
-    - First version÷
+    - First version

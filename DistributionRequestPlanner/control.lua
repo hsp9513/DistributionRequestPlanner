@@ -15,8 +15,8 @@ end
 
 function get_setting(player)
     local player_index=player.index
-    if not global.settings then global.settings={} end
-    local setting = global.settings[player_index]
+    if not storage.settings then storage.settings={} end
+    local setting = storage.settings[player_index]
     if not setting then
         setting = {
             mode = "n_second",
@@ -29,7 +29,7 @@ function get_setting(player)
             speed_bonus = 0,
             recipe = nil,
         }
-        global.settings[player_index] = setting 
+        storage.settings[player_index] = setting 
     end
     return setting
 end
@@ -53,7 +53,7 @@ function on_player_reverse_selected_area(event)
             end
 
             local target=event.entities[1]
-            local recipe = target.get_recipe()
+            local recipe,recipe_quality = target.get_recipe()
 
             if not recipe then
                 player.print({"distribution-request-planner.no-recipe"})
@@ -75,7 +75,10 @@ function on_player_reverse_selected_area(event)
             setting.entity_name    = target.name
             setting.crafting_speed = target.crafting_speed
             setting.speed_bonus    = target.speed_bonus
+            setting.entity_quality = target.quality
+
             setting.recipe         = recipe
+            setting.recipe_quality = recipe_quality
             setting.ingredients    = ingredients
             setting.fluids         = fluids
 
@@ -108,7 +111,7 @@ function on_player_reverse_selected_area(event)
             --    end
             --    item_requester.top.recipe_flow.request_label.caption=request_label
             --end
-            --global.target=ingredients
+            --storage.target=ingredients
 
         end
     end)
@@ -125,6 +128,7 @@ function on_player_selected_area(event)
             local player = game.players[event.player_index]
             local setting= get_setting(player)
             local requests = setting.requests
+            local recipe_quality = setting.recipe_quality
 
             if #event.entities == 0  then
                 return
@@ -146,7 +150,16 @@ function on_player_selected_area(event)
                    --for slot=1, entity.request_slot_count do
                    --    entity.clear_request_slot(slot)
                    --end
-                   if entity.request_slot_count>0 then
+                   local point = entity.get_requester_point()
+                   --if point.request_slot_count>0 then
+                   if point.sections_count>1  then
+                       player.print({"distribution-request-planner.already-set"})
+                       return
+                   elseif point.sections_count==0  then
+                       point.add_section()
+                   end
+                   local section = point.get_section(1)
+                   if section.filters_count>0 or section.group~="" then
                        player.print({"distribution-request-planner.already-set"})
                        return
                    end
@@ -165,12 +178,25 @@ function on_player_selected_area(event)
                 local request = requests[i]
                 local target_req_num = (i-1)%req_num+1
                 local requester = requesters[target_req_num]
-                --game.print("i="..i)
-                --game.print(game.table_to_json(request))
-                requester.set_request_slot({
-                    name=request.name,
-                    count=request.amount
-                },math.floor((i-1)/req_num)+1)
+                local point = requester.get_requester_point()
+                local section = point.get_section(1)
+                --requester.set_request_slot({
+                --    name=request.name,
+                --    count=request.amount
+                --},math.floor((i-1)/req_num)+1)
+                local slot_index = math.floor((i-1)/req_num)+1
+                local filter = {
+                    value={
+                        type = "item",
+                        name = request.name,
+                        quality = recipe_quality,
+                        comparator = nil
+                    },
+                    min=request.amount
+                }
+                --game.print("i="..slot_index)
+                --game.print(helpers.table_to_json(filter))
+                section.set_slot(slot_index, filter)
                 requester.request_from_buffers = setting.buffer_request
 
                 --if not toast_info[target_req_num] then 
@@ -211,17 +237,22 @@ function update_gui (player)
     local item_requester = player.gui.left.item_requester
     local setting = get_setting(player)
     if item_requester then
-        local entity_name = setting.entity_name
+        local entity_name    = setting.entity_name
+        local entity_quality = setting.entity_quality
         if entity_name then
-            local entity=game.entity_prototypes[entity_name]
-            item_requester.top.entity_flow.entity_button.elem_value=entity.name
+            local entity=prototypes.entity[entity_name]
+            --item_requester.top.entity_flow.entity_button.elem_value=entity.name
+            item_requester.top.entity_flow.entity_button.elem_value={name=entity.name,quality=entity_quality.name}
+            --game.print(entity.name.." "..entity_quality.name)
+            --item_requester.top.entity_flow.entity_button.elem_value={name=entity.name}
             local speed_bonus = (setting.speed_bonus~=0) and (" ("..sign(toFixed(setting.speed_bonus*100,2)).."%)") or ""
             item_requester.top.entity_flow.entity_label.caption={"",entity.localised_name,"\n",{"description.crafting-speed"}," : ",toFixed(setting.crafting_speed,2), speed_bonus }
         end
 
-        local recipe      = setting.recipe
-        local ingredients = setting.ingredients
-        local fluids      = setting.fluids
+        local recipe         = setting.recipe
+        local recipe_quality = setting.recipe_quality
+        local ingredients    = setting.ingredients
+        local fluids         = setting.fluids
 
         local n_second_field = item_requester.top.n_second_flow.n_second_field
         local n_count_field  = item_requester.top.n_count_flow .n_count_field
@@ -229,14 +260,16 @@ function update_gui (player)
         if n_count_field .text=="" then n_count_field .text="0" end
 
         if recipe then
-            item_requester.top.recipe_flow.recipe_button.elem_value=recipe.name
+            --item_requester.top.recipe_flow.recipe_button.elem_value=recipe.name
+            --game.print(recipe.name.." "..recipe_quality.name)
+            item_requester.top.recipe_flow.recipe_button.elem_value={name=recipe.name,quality=recipe_quality.name}
 
             local recipe_label = {"",{"description.ingredients"},"\n[img=quantity-time]   "..recipe.energy}
             for _,ingredient in pairs(ingredients) do
-                table.insert(recipe_label, "\n[img=item/"..ingredient.name.."] "..ingredient.amount)
+                table.insert(recipe_label, "\n[item="..ingredient.name..",quality="..recipe_quality.name.."] "..ingredient.amount)
             end
             for _,ingredient in pairs(fluids) do
-                table.insert(recipe_label, "\n[img=fluid/"..ingredient.name.."] "..ingredient.amount)
+                table.insert(recipe_label, "\n[fluid="..ingredient.name.."] "..ingredient.amount)
             end
             item_requester.top.recipe_flow.recipe_label.caption=recipe_label
             
@@ -250,8 +283,10 @@ function update_gui (player)
             local requests = {}
             for _,ingredient in pairs(ingredients) do
                 local value = toFixed(ingredient.amount*mul,0)
+                value = (value==0) and 1 or value -- prevent amount 0
                 table.insert(requests, {name=ingredient.name, amount=value})
-                table.insert(request_label, "\n[img=item/"..ingredient.name.."] "..value)
+                --table.insert(request_label, "\n[img=item/"..ingredient.name.."] "..value)
+                table.insert(request_label, "\n[item="..ingredient.name..",quality="..recipe_quality.name.."] "..value)
             end
             setting.requests=requests
             item_requester.top.recipe_flow.request_label.caption=request_label
@@ -299,7 +334,8 @@ function show_gui (player)
         top.add{type="line"}
 
         local entity_flow  =top        .add{type="flow"              ,name="entity_flow"  ,direction="horizontal"}
-        local entity_button=entity_flow.add{type="choose-elem-button",name="entity_button",elem_type="entity"}
+        --local entity_button=entity_flow.add{type="choose-elem-button",name="entity_button",elem_type="entity"}
+        local entity_button=entity_flow.add{type="choose-elem-button",name="entity_button",elem_type="entity-with-quality"}
         local entity_label =entity_flow.add{type="label"             ,name="entity_label" ,caption={"distribution-request-planner.select-machine"}}
         entity_button.locked=true
         entity_label.style.single_line=false
@@ -307,7 +343,8 @@ function show_gui (player)
         top.add{type="line"}
 
         local recipe_flow   = top        .add{type="flow"              ,name="recipe_flow"  ,direction="horizontal"}
-        local recipe_button = recipe_flow.add{type="choose-elem-button",name="recipe_button",elem_type="recipe"}
+        --local recipe_button = recipe_flow.add{type="choose-elem-button",name="recipe_button",elem_type="recipe"}
+        local recipe_button = recipe_flow.add{type="choose-elem-button",name="recipe_button",elem_type="recipe-with-quality"}
         local recipe_label  = recipe_flow.add{type="label"             ,name="recipe_label" ,caption={"distribution-request-planner.select-machine"}}
         recipe_flow.add{type="label",caption="      "}
         local request_label = recipe_flow.add{type="label"             ,name="request_label",caption=""}
@@ -418,7 +455,7 @@ function reset()
         local item_requester = player.gui.left.item_requester
         if item_requester then item_requester.destroy() end
     end
-    global.settings=nil
+    storage.settings=nil
 end
 
 function error_message(message)
