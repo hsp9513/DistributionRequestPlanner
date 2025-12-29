@@ -23,6 +23,8 @@ function get_setting(player)
             n_second = 30,
             n_count = 1,
             buffer_request = false,
+            trash = false,
+            override = false,
             requests = {},
             entity_name = nil,
             crafting_speed = 1,
@@ -143,31 +145,60 @@ function on_player_selected_area(event)
             end
 
             local requesters={}
+            local overridden=0
             for _,entity in pairs(event.entities) do
-               --game.print(entity.unit_number.. entity.prototype.logistic_mode )
-               if entity.prototype.logistic_mode == "requester" or entity.prototype.logistic_mode == "buffer" then
-                   table.insert(requesters, entity)
-                   --for slot=1, entity.request_slot_count do
-                   --    entity.clear_request_slot(slot)
-                   --end
-                   local point = entity.get_requester_point()
-                   --if point.request_slot_count>0 then
-                   if point.sections_count>1  then
-                       player.print({"distribution-request-planner.already-set"})
-                       return
-                   elseif point.sections_count==0  then
+                --game.print(entity.unit_number.. entity.prototype.logistic_mode )
+                if entity.prototype.logistic_mode == "requester" or entity.prototype.logistic_mode == "buffer" then
+                    table.insert(requesters, entity)
+                    --for slot=1, entity.request_slot_count do
+                    --    entity.clear_request_slot(slot)
+                    --end
+                    local point = entity.get_requester_point()
+                    --if point.request_slot_count>0 then
+                    if point.sections_count>1  then
+                        if setting.override then
+                            if settings.global["requester-override-admin-only"].value and not player.admin then
+                                player.print({"distribution-request-planner.requester-override-admin-only"})
+                                return
+                            end
+
+                            while point.sections_count>0 do
+                                point.remove_section(1)
+                            end
+                            point.add_section()
+                            overridden=overridden+1
+                        else
+                            player.print({"distribution-request-planner.already-set"})
+                            return
+                        end
+
+                    elseif point.sections_count==0  then
                        point.add_section()
-                   end
-                   local section = point.get_section(1)
-                   if section.filters_count>0 or section.group~="" then
-                       player.print({"distribution-request-planner.already-set"})
-                       return
-                   end
-               end
+                    end
+                    local section = point.get_section(1)
+                    if section.filters_count>0 or section.group~="" then
+                        if setting.override then
+                            if settings.global["requester-override-admin-only"].value and not player.admin then
+                                player.print({"distribution-request-planner.requester-override-admin-only"})
+                                return
+                            end
+                            point.remove_section(1)
+                            point.add_section()
+                            overridden=overridden+1
+                        else
+                            player.print({"distribution-request-planner.already-set"})
+                            return
+                        end
+                    end
+                end
             end
 
             local req_num = #requesters
-            player.print({"distribution-request-planner.selected-chest",req_num})
+            if overridden==0 then
+                player.print({"distribution-request-planner.selected-chest",req_num})
+            else
+                player.print({"",{"distribution-request-planner.selected-chest",req_num},{"distribution-request-planner.overridden-chest",overridden}})
+            end
 
             if req_num==0 then
                 return
@@ -198,6 +229,7 @@ function on_player_selected_area(event)
                 --game.print(helpers.table_to_json(filter))
                 section.set_slot(slot_index, filter)
                 requester.request_from_buffers = setting.buffer_request
+                point.trash_not_requested = setting.trash
 
                 --if not toast_info[target_req_num] then 
                 --    toast_info[target_req_num] = {
@@ -328,8 +360,14 @@ function show_gui (player)
         n_second_field.style.horizontal_align="right"
         n_count_field .style.horizontal_align="right"
 
+        local trash_flow     = top       .add{type="flow"    ,name="trash_flow"    ,direction="horizontal"}
+        local trash_checkbox = trash_flow.add{type="checkbox",name="trash_checkbox",caption={"trash-not-requested-items"},state=false}
+
         local buffer_flow     = top        .add{type="flow"    ,name="buffer_flow"    ,direction="horizontal"}
         local buffer_checkbox = buffer_flow.add{type="checkbox",name="buffer_checkbox",caption={"gui-logistic.request-from-buffer-chests"},state=false}
+
+        local override_flow     = top          .add{type="flow"    ,name="override_flow"    ,direction="horizontal"}
+        local override_checkbox = override_flow.add{type="checkbox",name="override_checkbox",caption={"distribution-request-planner.override"},tooltip={"distribution-request-planner.override-description"},state=false}
 
         top.add{type="line"}
 
@@ -414,6 +452,12 @@ function on_gui_click(event)
                 update_gui(player)
             elseif element.name=="buffer_checkbox" then
                 setting.buffer_request = item_requester.top.buffer_flow.buffer_checkbox.state
+                update_gui(player)
+            elseif element.name=="trash_checkbox" then
+                setting.trash = item_requester.top.trash_flow.trash_checkbox.state
+                update_gui(player)
+            elseif element.name=="override_checkbox" then
+                setting.override = item_requester.top.override_flow.override_checkbox.state
                 update_gui(player)
             end
         end
